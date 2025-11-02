@@ -2,54 +2,69 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-class AuthPage extends StatefulWidget {
-  const AuthPage({super.key});
+class LoginPage extends StatefulWidget {
+  const LoginPage({Key? key}) : super(key: key);
 
   @override
-  State<AuthPage> createState() => _AuthPageState();
+  State<LoginPage> createState() => _LoginPageState();
 }
 
-class _AuthPageState extends State<AuthPage> {
-  bool isLogin = true;
-
+class _LoginPageState extends State<LoginPage> {
   final _formKey = GlobalKey<FormState>();
+  bool _isLogin = true;
+  bool _loading = false;
+
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
   final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
 
-  Future<void> submit() async {
+  final _grade1Controller = TextEditingController();
+  final _grade2Controller = TextEditingController();
+  final _grade3Controller = TextEditingController();
+  final _grade4Controller = TextEditingController();
+
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+
+  Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
 
-    final auth = FirebaseAuth.instance;
-    final firestore = FirebaseFirestore.instance;
+    setState(() => _loading = true);
 
     try {
-      if (isLogin) {
+      if (_isLogin) {
         
-        await auth.signInWithEmailAndPassword(
+        await _auth.signInWithEmailAndPassword(
           email: _emailController.text.trim(),
           password: _passwordController.text.trim(),
         );
       } else {
-        // 🔹 Register
-        final userCredential = await auth.createUserWithEmailAndPassword(
+        
+        UserCredential userCredential = await _auth.createUserWithEmailAndPassword(
           email: _emailController.text.trim(),
           password: _passwordController.text.trim(),
         );
 
-        
-        await firestore.collection('students').doc(userCredential.user!.uid).set({
+        await _firestore.collection('students').doc(userCredential.user!.uid).set({
           'name': _nameController.text.trim(),
           'email': _emailController.text.trim(),
           'phone': _phoneController.text.trim(),
+          'grades': {
+            'subject1': double.parse(_grade1Controller.text.trim()),
+            'subject2': double.parse(_grade2Controller.text.trim()),
+            'subject3': double.parse(_grade3Controller.text.trim()),
+            'subject4': double.parse(_grade4Controller.text.trim()),
+          },
           'createdAt': Timestamp.now(),
         });
       }
-    } catch (e) {
+    } on FirebaseAuthException catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.toString())),
+        SnackBar(content: Text(e.message ?? 'An error occurred')),
       );
+    } finally {
+      setState(() => _loading = false);
     }
   }
 
@@ -57,50 +72,86 @@ class _AuthPageState extends State<AuthPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(isLogin ? 'Login' : 'Register'),
+        title: Text(_isLogin ? 'Login' : 'Register'),
         centerTitle: true,
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Form(
-          key: _formKey,
-          child: ListView(
-            children: [
-              if (!isLogin)
+      body: Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(20),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              children: [
+                if (!_isLogin)
+                  TextFormField(
+                    controller: _nameController,
+                    decoration: const InputDecoration(labelText: 'Full Name'),
+                    validator: (value) =>
+                        value!.isEmpty ? 'Enter your name' : null,
+                  ),
                 TextFormField(
-                  controller: _nameController,
-                  decoration: const InputDecoration(labelText: 'Name'),
-                  validator: (value) => value!.isEmpty ? 'Enter your name' : null,
+                  controller: _emailController,
+                  decoration: const InputDecoration(labelText: 'Email'),
+                  validator: (value) =>
+                      value!.isEmpty ? 'Enter your email' : null,
                 ),
-              TextFormField(
-                controller: _emailController,
-                decoration: const InputDecoration(labelText: 'Email'),
-                validator: (value) => value!.isEmpty ? 'Enter your email' : null,
-              ),
-              if (!isLogin)
+                if (!_isLogin)
+                  TextFormField(
+                    controller: _phoneController,
+                    decoration: const InputDecoration(labelText: 'Phone'),
+                    validator: (value) =>
+                        value!.isEmpty ? 'Enter your phone number' : null,
+                  ),
                 TextFormField(
-                  controller: _phoneController,
-                  decoration: const InputDecoration(labelText: 'Phone'),
-                  validator: (value) => value!.isEmpty ? 'Enter your phone' : null,
+                  controller: _passwordController,
+                  decoration: const InputDecoration(labelText: 'Password'),
+                  obscureText: true,
+                  validator: (value) =>
+                      value!.length < 6 ? 'Password must be 6+ chars' : null,
                 ),
-              TextFormField(
-                controller: _passwordController,
-                obscureText: true,
-                decoration: const InputDecoration(labelText: 'Password'),
-                validator: (value) => value!.length < 8 ? 'At least 8 characters' : null,
-              ),
-              const SizedBox(height: 20),
-              ElevatedButton(
-                onPressed: submit,
-                child: Text(isLogin ? 'Login' : 'Register'),
-              ),
-              TextButton(
-                onPressed: () => setState(() => isLogin = !isLogin),
-                child: Text(isLogin
-                    ? 'Don’t have an account? Register'
-                    : 'Already registered? Login'),
-              ),
-            ],
+                if (!_isLogin) ...[
+                  const SizedBox(height: 20),
+                  Text('Enter your grades:', style: TextStyle(fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 10),
+                  TextFormField(
+                    controller: _grade1Controller,
+                    decoration: const InputDecoration(labelText: 'Grade 1'),
+                    validator: (v) => v!.isEmpty ? 'Enter Grade 1' : null,
+                  ),
+                  TextFormField(
+                    controller: _grade2Controller,
+                    decoration: const InputDecoration(labelText: 'Grade 2'),
+                    validator: (v) => v!.isEmpty ? 'Enter Grade 2' : null,
+                  ),
+                  TextFormField(
+                    controller: _grade3Controller,
+                    decoration: const InputDecoration(labelText: 'Grade 3'),
+                    validator: (v) => v!.isEmpty ? 'Enter Grade 3' : null,
+                  ),
+                  TextFormField(
+                    controller: _grade4Controller,
+                    decoration: const InputDecoration(labelText: 'Grade 4'),
+                    validator: (v) => v!.isEmpty ? 'Enter Grade 4' : null,
+                  ),
+                ],
+                const SizedBox(height: 30),
+                _loading
+                    ? const CircularProgressIndicator()
+                    : ElevatedButton(
+                        onPressed: _submit,
+                        child: Text(_isLogin ? 'Login' : 'Register'),
+                      ),
+                const SizedBox(height: 10),
+                TextButton(
+                  onPressed: () {
+                    setState(() => _isLogin = !_isLogin);
+                  },
+                  child: Text(_isLogin
+                      ? 'Don\'t have an account? Register'
+                      : 'Already have an account? Login'),
+                ),
+              ],
+            ),
           ),
         ),
       ),
