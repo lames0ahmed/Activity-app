@@ -22,7 +22,7 @@ class HomePage extends StatelessWidget {
 
           final docs = snapshot.data!.docs;
 
-          // -------- حساب مجموع الدرجات لكل طالب وترتيبهم --------
+          
           final students = docs.map((doc) {
             final data = doc.data() as Map<String, dynamic>;
             final grades = Map<String, dynamic>.from(data['grades']);
@@ -41,7 +41,6 @@ class HomePage extends StatelessWidget {
 
           students.sort((a, b) => b['total'].compareTo(a['total']));
 
-          // -------- عرض الترتيب --------
           return ListView.builder(
             itemCount: students.length,
             itemBuilder: (context, index) {
