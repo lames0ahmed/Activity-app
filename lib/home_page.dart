@@ -1,63 +1,76 @@
+import 'package:activity_app/student_page.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+
 
 class HomePage extends StatelessWidget {
   const HomePage({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final user = FirebaseAuth.instance.currentUser;
-    final uid = user!.uid;
-
     return Scaffold(
       appBar: AppBar(
-        title: const Text("My Grades"),
+        title: const Text("Students Ranking"),
         centerTitle: true,
       ),
-      body: FutureBuilder<DocumentSnapshot>(
-        future: FirebaseFirestore.instance.collection('students').doc(uid).get(),
+      body: FutureBuilder<QuerySnapshot>(
+        future: FirebaseFirestore.instance.collection('students').get(),
         builder: (context, snapshot) {
           if (!snapshot.hasData) {
             return const Center(child: CircularProgressIndicator());
           }
 
-          final data = snapshot.data!.data() as Map<String, dynamic>;
-          final grades = Map<String, dynamic>.from(data['grades']);
+          final docs = snapshot.data!.docs;
 
-          // ✨ هنا بنرتب المواد حسب الدرجات
-          final sortedGrades = grades.entries.toList()
-            ..sort((a, b) => b.value.compareTo(a.value));
+          // -------- حساب مجموع الدرجات لكل طالب وترتيبهم --------
+          final students = docs.map((doc) {
+            final data = doc.data() as Map<String, dynamic>;
+            final grades = Map<String, dynamic>.from(data['grades']);
 
-          return ListView(
-            padding: const EdgeInsets.all(20),
-            children: [
-              Text(
-                data['name'],
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontSize: 26,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 20),
+            int total = grades.values
+    .map((e) => (e as num).toInt())
+    .fold(0, (a, b) => a + b);
 
-              const Text(
-                "Your Grades (High → Low):",
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 10),
 
-              ...sortedGrades.map((entry) {
-                return Card(
-                  child: ListTile(
-                    title: Text(entry.key.toUpperCase()),
-                    trailing: Text(entry.value.toString(),
-                        style: const TextStyle(fontSize: 18)),
+            return {
+              "id": doc.id,
+              "name": data['name'],
+              "total": total,
+            };
+          }).toList();
+
+          students.sort((a, b) => b['total'].compareTo(a['total']));
+
+          // -------- عرض الترتيب --------
+          return ListView.builder(
+            itemCount: students.length,
+            itemBuilder: (context, index) {
+              final student = students[index];
+
+              return Card(
+                child: ListTile(
+                  leading: CircleAvatar(
+                    child: Text("${index + 1}"),
                   ),
-                );
-              }).toList(),
-            ],
+                  title: Text(student["name"]),
+                  trailing: Text(
+                    "Total: ${student['total']}",
+                    style: const TextStyle(fontSize: 16),
+                  ),
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => StudentDetailsPage(
+                          studentId: student["id"],
+                          studentName: student["name"],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              );
+            },
           );
         },
       ),
